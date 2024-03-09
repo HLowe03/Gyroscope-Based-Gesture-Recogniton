@@ -2,60 +2,71 @@
 #include <Servo.h>
 
 
-const int MPU = 0x68; // MPU6050 I2C address
-float AccX, AccY, AccZ;
-float GyroX, GyroY, GyroZ;
+const int mpuAddress = 0x68; // 0b1101000 from datasheet Section 9.2
+
+float AcX, AcY, AcZ, GyX, GyY, GyZ;
+
 float accAngleX, accAngleY, gyroAngleX, gyroAngleY, gyroAngleZ;
+
 float roll, pitch, yaw;
-float AccErrorX, AccErrorY, GyroErrorX, GyroErrorY, GyroErrorZ;
+
+float sensScalar = 16384.0; // from datasheet 
+float gyroScalar = 131.0; // from datasheet, section 6.1 
+
 float elapsedTime, currentTime, previousTime;
 int c = 0;
 Servo myServo;
+
 void setup() {
-  Serial.begin(19200);
-  Wire.begin();                      // Initialize comunication
-  Wire.beginTransmission(MPU);       // Start communication with MPU6050 // MPU=0x68
-  Wire.write(0x6B);                  // Talk to the register 6B
-  Wire.write(0x00);                  // Make reset - place a 0 into the 6B register
-  Wire.endTransmission(true);        //end the transmission
+  Serial.begin(9600);
+
+  Wire.begin();
+  Wire.beginTransmission(mpuAddress);
+
+  // Register at the address 0x6B is todo with power management
+  // Writing 0 to this register forces a reset, without having to cut power
+  Wire.write(0x6B);
+  Wire.write(0);
+  Wire.endTransmission(true);
 
   delay(20);
   myServo.attach(6);
 }
 void loop() {
   // === Read acceleromter data === //
-  Wire.beginTransmission(MPU);
+  Wire.beginTransmission(mpuAddress);
   Wire.write(0x3B); // Start with register 0x3B (ACCEL_XOUT_H)
   Wire.endTransmission(false);
-  Wire.requestFrom(MPU, 6, true); // Read 6 registers total, each axis value is stored in 2 registers
-  //For a range of +-2g, we need to divide the raw values by 16384, according to the datasheet
-  AccX = (Wire.read() << 8 | Wire.read()) / 16384.0; // X-axis value
-  AccY = (Wire.read() << 8 | Wire.read()) / 16384.0; // Y-axis value
-  AccZ = (Wire.read() << 8 | Wire.read()) / 16384.0; // Z-axis value
+  Wire.requestFrom(mpuAddress, 14, true); // Read 6 registers total, each axis value is stored in 2 registers
 
-  
-  // Calculating Roll and Pitch from the accelerometer data
-  accAngleX = (atan(AccY / sqrt(pow(AccX, 2) + pow(AccZ, 2))) * 180 / PI) - 0.58; // AccErrorX ~(0.58) See the calculate_IMU_error()custom function for more details
-  accAngleY = (atan(-1 * AccX / sqrt(pow(AccY, 2) + pow(AccZ, 2))) * 180 / PI) + 1.58; // AccErrorY ~(-1.58)
-  // === Read gyroscope data === //
+  AcX = (Wire.read() << 8 | Wire.read()) / sensScalar; 
+  AcY = (Wire.read() << 8 | Wire.read()) / sensScalar; 
+  AcZ = (Wire.read() << 8 | Wire.read()) / sensScalar;
+
+  (Wire.read() << 8 | Wire.read()); // fetch then Disregard, this is faster then doing two transmissions of 6 registers each
+
+  GyX = (Wire.read() << 8 | Wire.read()) / gyroScalar; 
+  GyY = (Wire.read() << 8 | Wire.read()) / gyroScalar;
+  GyZ = (Wire.read() << 8 | Wire.read()) / gyroScalar;
+
+
+
   previousTime = currentTime;        // Previous time is stored before the actual time read
   currentTime = millis();            // Current time actual time read
   elapsedTime = (currentTime - previousTime) / 1000; // Divide by 1000 to get seconds
-  Wire.beginTransmission(MPU);
-  Wire.write(0x43); // Gyro data first register address 0x43
-  Wire.endTransmission(false);
-  Wire.requestFrom(MPU, 6, true); // Read 4 registers total, each axis value is stored in 2 registers
-  GyroX = (Wire.read() << 8 | Wire.read()) / 131.0; // For a 250deg/s range we have to divide first the raw value by 131.0, according to the datasheet
-  GyroY = (Wire.read() << 8 | Wire.read()) / 131.0;
-  GyroZ = (Wire.read() << 8 | Wire.read()) / 131.0;
-  // Correct the outputs with the calculated error values
-  GyroX = GyroX + 0.56; // GyroErrorX ~(-0.56)
-  GyroY = GyroY - 2; // GyroErrorY ~(2)
-  GyroZ = GyroZ + 0.79; // GyroErrorZ ~ (-0.8)
-  // Currently the raw values are in degrees per seconds, deg/s, so we need to multiply by sendonds (s) to get the angle in degrees
-  gyroAngleX = gyroAngleX + GyroX * elapsedTime; // deg/s * s = deg
-  gyroAngleY = gyroAngleY + GyroY * elapsedTime;
-  yaw =  yaw + GyroZ * elapsedTime;
+  
+  
+  accAngleX = (atan(AcY / sqrt(pow(AcX, 2) + pow(AcZ, 2))) * 180 / PI);
+
+  
+  accAngleY = (atan(-1 * AcX / sqrt(pow(AcY, 2) + pow(AcZ, 2))) * 180 / PI);
+
+
+  // The raw gyroscope data is in degrees per second, multiplying by time gets the acutual degree, lots of data innacuracy occurs here.
+  gyroAngleX = gyroAngleX + GyX * elapsedTime; // deg/s * s = deg
+  gyroAngleY = gyroAngleY + GyY * elapsedTime;
+
+  yaw =  yaw + GyZ * elapsedTime;
 
 
   // Complementary filter - combine acceleromter and gyro angle values
@@ -65,13 +76,16 @@ void loop() {
   roll = gyroAngleX;
   pitch = gyroAngleY;
   
-  // Print the values on the serial monitor
-  Serial.print(roll);
-  Serial.print("/");
-  Serial.print(pitch);
-  Serial.print("/");
-  Serial.println(yaw);
-  int servoAngle = map(yaw, 90, -90, 180, 0);
+
+  Serial.print(" Roll: ");   Serial.print(roll);
+  Serial.print(" | Pitch: ");   Serial.print(pitch);
+  Serial.print(" | Yaw: ");   Serial.print(yaw);
+  Serial.println();
+
+
+  int servoAngle = map(yaw, 45, -45, 180, 0);
   myServo.write(servoAngle);
+
+
   delay(20);
 }
