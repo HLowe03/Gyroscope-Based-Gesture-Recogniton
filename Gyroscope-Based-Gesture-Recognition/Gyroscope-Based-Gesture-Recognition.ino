@@ -3,6 +3,9 @@
 
 
 const int mpuAddress = 0x68; // 0b1101000 from datasheet Section 9.2
+const int greLED = 11;
+const int redLED = 2;
+const int buzzerPin = 4;
 
 float AcX, AcY, AcZ, GyX, GyY, GyZ;
 
@@ -14,7 +17,12 @@ float sensScalar = 16384.0; // from datasheet
 float gyroScalar = 131.0; // from datasheet, section 6.1 
 
 float elapsedTime, currentTime, previousTime;
+
 int c = 0;
+
+int servoAngle = 90;
+
+
 Servo myServo;
 
 void setup() {
@@ -30,6 +38,10 @@ void setup() {
   Wire.endTransmission(true);
 
   delay(20);
+
+  pinMode(greLED, OUTPUT);
+  pinMode(redLED, OUTPUT);
+  pinMode(buzzerPin, OUTPUT);
   myServo.attach(6);
 }
 void loop() {
@@ -83,8 +95,27 @@ void loop() {
   Serial.println();
 
 
-  int servoAngle = map(yaw, 45, -45, 180, 0);
+  servoAngle = map(yaw, 45, -45, 180, 0);
+
+  if (pitch <= -50) { // Overflow Mode, move to stop postion, red lights, and speaker on
+    servoAngle = 180;
+    digitalWrite(buzzerPin, HIGH);
+  }
+  else {
+    digitalWrite(buzzerPin, LOW);
+  }
+
   myServo.write(servoAngle);
+
+  // lighting code, if valve is closed, red light on, green light on otherwise
+  if (servoAngle >= 180) {
+    digitalWrite(greLED, LOW);
+    digitalWrite(redLED, HIGH);
+  }
+  else {
+    digitalWrite(redLED, LOW);
+    digitalWrite(greLED, HIGH);
+  }
 
 
   delay(20);
