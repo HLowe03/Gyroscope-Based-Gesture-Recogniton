@@ -18,8 +18,6 @@ float gyroScalar = 131.0; // from datasheet, section 6.1
 
 float elapsedTime, currentTime, previousTime;
 
-int c = 0;
-
 int servoAngle = 90;
 
 
@@ -28,14 +26,15 @@ Servo myServo;
 void setup() {
   Serial.begin(9600);
 
-  Wire.begin();
-  Wire.beginTransmission(mpuAddress);
+  Wire.begin(); 
+  Wire.beginTransmission(mpuAddress); 
 
   // Register at the address 0x6B is todo with power management
   // Writing 0 to this register forces a reset, without having to cut power
   Wire.write(0x6B);
   Wire.write(0);
   Wire.endTransmission(true);
+  
 
   delay(20);
 
@@ -62,21 +61,17 @@ void loop() {
   GyZ = (Wire.read() << 8 | Wire.read()) / gyroScalar;
 
 
-
   previousTime = currentTime;        // Previous time is stored before the actual time read
   currentTime = millis();            // Current time actual time read
   elapsedTime = (currentTime - previousTime) / 1000; // Divide by 1000 to get seconds
   
   
   accAngleX = (atan(AcY / sqrt(pow(AcX, 2) + pow(AcZ, 2))) * 180 / PI);
-
-  
   accAngleY = (atan(-1 * AcX / sqrt(pow(AcY, 2) + pow(AcZ, 2))) * 180 / PI);
 
-
   // The raw gyroscope data is in degrees per second, multiplying by time gets the acutual degree, lots of data innacuracy occurs here.
-  gyroAngleX = gyroAngleX + GyX * elapsedTime; // deg/s * s = deg
-  gyroAngleY = gyroAngleY + GyY * elapsedTime;
+  gyroAngleX += (GyX * elapsedTime); // deg/s * s = deg
+  gyroAngleY += (GyY * elapsedTime);
 
   yaw =  yaw + GyZ * elapsedTime;
 
