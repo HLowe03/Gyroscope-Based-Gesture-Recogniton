@@ -13,6 +13,11 @@ float accAngleX, accAngleY, gyroAngleX, gyroAngleY, gyroAngleZ;
 
 float roll, pitch, yaw;
 
+float sqrAcZ, sqrAcX, sqrAcY;
+float addedSquares;
+
+
+
 float sensScalar = 16384.0; // from datasheet 
 float gyroScalar = 131.0; // from datasheet, section 6.1 
 
@@ -61,19 +66,34 @@ void loop() {
   GyZ = (Wire.read() << 8 | Wire.read()) / gyroScalar;
 
 
-  previousTime = currentTime;        // Previous time is stored before the actual time read
-  currentTime = millis();            // Current time actual time read
+  previousTime = currentTime;  // Previous time is stored before the actual time read
+  currentTime = millis();  // Current time actual time read
   elapsedTime = (currentTime - previousTime) / 1000; // Divide by 1000 to get seconds
+
+
+  sqrAcX = pow(AcX, 2);
+  sqrAcZ = pow(AcZ, 2);
+  sqrAcY = pow(AcY, 2);
+
+  //Calculate X
+  addedSquares = sqrAcX + sqrAcZ;
+  addedSquares = sqrt(addedSquares);
+  accAngleX = atan(AcY / addedSquares);
+  accAngleX = accAngleX * 180.0 / PI;
+
+  // Calculate Y
   
+  addedSquares = sqrAcY + sqrAcZ;
+  addedSquares = sqrt(addedSquares);
+  accAngleY = atan(-1 * AcX / addedSquares);
+  accAngleY = accAngleY * 180.0 / PI;
   
-  accAngleX = (atan(AcY / sqrt(pow(AcX, 2) + pow(AcZ, 2))) * 180 / PI);
-  accAngleY = (atan(-1 * AcX / sqrt(pow(AcY, 2) + pow(AcZ, 2))) * 180 / PI);
+
 
   // The raw gyroscope data is in degrees per second, multiplying by time gets the acutual degree, lots of data innacuracy occurs here.
   gyroAngleX += (GyX * elapsedTime); // deg/s * s = deg
   gyroAngleY += (GyY * elapsedTime);
-
-  yaw =  yaw + GyZ * elapsedTime;
+  yaw += (GyZ * elapsedTime);
 
 
   // Complementary filter - combine acceleromter and gyro angle values
