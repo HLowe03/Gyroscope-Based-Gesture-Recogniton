@@ -70,11 +70,12 @@ void loop() {
   currentTime = millis();  // Current time actual time read
   elapsedTime = (currentTime - previousTime) / 1000; // Divide by 1000 to get seconds
 
-
+  // https://howtomechatronics.com/tutorials/arduino/arduino-and-mpu6050-accelerometer-and-gyroscope-tutorial/
+  
   sqrAcX = pow(AcX, 2);
   sqrAcZ = pow(AcZ, 2);
   sqrAcY = pow(AcY, 2);
-
+  
   //Calculate X
   addedSquares = sqrAcX + sqrAcZ;
   addedSquares = sqrt(addedSquares);
